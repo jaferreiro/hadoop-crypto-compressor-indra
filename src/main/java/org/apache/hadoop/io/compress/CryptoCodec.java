@@ -31,13 +31,13 @@ public class CryptoCodec implements CompressionCodec, Configurable {
 	@Override
 	public Compressor createCompressor() {
 		LOG.info("Creating compressor");
-		return new CryptoBasicCompressor(config.get(CRYPTO_SECRET_KEY));
+		return new CryptoBasicCompressor(config.get(CRYPTO_SECRET_KEY, "defaultkey"));
 	}
 
 	@Override
 	public Decompressor createDecompressor() {
 		LOG.info("Creating decompressor");
-		return new CryptoBasicDecompressor(config.get(CRYPTO_SECRET_KEY));
+		return new CryptoBasicDecompressor(config.get(CRYPTO_SECRET_KEY, "defaultkey"));
 	}
 
 	@Override
