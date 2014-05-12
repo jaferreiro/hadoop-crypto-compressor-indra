@@ -5,14 +5,15 @@ import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.spec.AlgorithmParameterSpec;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -65,12 +66,12 @@ public class Crypto {
 
 		AlgorithmParameterSpec paramSpec = new IvParameterSpec(iv);
 		try {
-			ecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			dcipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            ecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            dcipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 
 			// CBC requires an initialization vector
 			ecipher.init(Cipher.ENCRYPT_MODE, key, paramSpec);
-			dcipher.init(Cipher.DECRYPT_MODE, key, paramSpec);
+            dcipher.init(Cipher.DECRYPT_MODE, key, paramSpec);
 		}
 		catch(Exception e) {
 			log.error(e);
@@ -95,8 +96,8 @@ public class Crypto {
 			log.error(e);
 		}
 		finally {
-			IOUtils.closeQuietly(in);
-			IOUtils.closeQuietly(out);
+			try { in.close(); } catch (Exception e1) {}
+			try { out.close(); } catch (Exception e2) {}
 		}
 	}
 
@@ -149,8 +150,8 @@ public class Crypto {
 			log.error(e);
 		}
 		finally {
-			IOUtils.closeQuietly(in);
-			IOUtils.closeQuietly(out);
+            try { in.close(); } catch (Exception e1) {}
+            try { out.close(); } catch (Exception e2) {}
 		}
 	}
 
@@ -172,19 +173,16 @@ public class Crypto {
 
 	public byte[] decrypt(byte[] ciphertext) {
 		try {
-			return dcipher.doFinal(ciphertext);
+//            return dcipher.update(ciphertext);
+            return dcipher.doFinal(ciphertext);
 		}
 		catch(Exception e) {
 			log.error("Lenght: " + ciphertext.length, e);
-			for(byte b : ciphertext) {
-				System.out.print(b);
-				System.out.print(",");
-			}
 			log.error(e);
 			return null;
 		}
 	}
-
+	
 	private static byte[] getMD5(String input) {
 		try {
 			byte[] bytesOfMessage = input.getBytes("UTF-8");
