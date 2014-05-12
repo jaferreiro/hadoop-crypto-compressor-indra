@@ -108,6 +108,48 @@ public class TestCodec {
 	}
 
 	@Test
+	public void ultimateTest() throws IOException {
+	    
+	    int NUM_ELEMS = 1 ;
+	    
+	    this.conf.set(CryptoCodec.CRYPTO_SECRET_KEY, "Una clave cualquiera");
+        // Create the codec
+        CompressionCodec codec = null;
+        try {
+            codec = (CompressionCodec) ReflectionUtils.newInstance(this.conf.getClassByName("org.apache.hadoop.io.compress.CryptoCodec"), this.conf);
+        }
+        catch(ClassNotFoundException cnfe) {
+            throw new IOException("Illegal codec!");
+        }
+
+        // Generate data
+        DataOutputBuffer data = new DataOutputBuffer();
+        for(int i = 0; i < NUM_ELEMS; i++) {
+            data.writeInt(i) ;
+        }
+        
+        // Encrypt data
+        DataOutputBuffer encryptedDataBuffer = new DataOutputBuffer();
+        CompressionOutputStream deflateFilter = codec.createOutputStream(encryptedDataBuffer);
+        DataOutputStream deflateOut = new DataOutputStream(new BufferedOutputStream(deflateFilter));
+        deflateOut.write(data.getData(), 0, data.getLength());
+        deflateOut.flush();
+        deflateFilter.finish();
+        LOG.info("Finished compressing data");
+
+        // De-compress data
+        DataInputBuffer deCompressedDataBuffer = new DataInputBuffer();
+        deCompressedDataBuffer.reset(encryptedDataBuffer.getData(), 0, encryptedDataBuffer.getLength());
+        CompressionInputStream inflateFilter = codec.createInputStream(deCompressedDataBuffer);
+        DataInputStream inflateIn = new DataInputStream(new BufferedInputStream(inflateFilter));
+        
+        // Check
+        for(int i = 0; i < NUM_ELEMS; i++) {
+            Assert.assertEquals(i, inflateIn.readInt()) ;
+        }
+	}
+	
+	@Test
 	public void testCryptoCodec() throws IOException {
 		conf.set(CryptoCodec.CRYPTO_SECRET_KEY, "Una clave cualquiera");
 		codecTest(conf, seed, 0, "org.apache.hadoop.io.compress.CryptoCodec");
