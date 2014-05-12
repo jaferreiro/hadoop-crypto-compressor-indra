@@ -2,8 +2,10 @@ package sec.util;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.spec.AlgorithmParameterSpec;
+import java.util.Arrays;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -14,8 +16,10 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.IOUtils;
 
 /**
  * Main Crypto class it's responsible for
@@ -33,7 +37,9 @@ public class Crypto {
 	Cipher ecipher;
 
 	Cipher dcipher;
-
+	int decipherCurrentBlock ;
+	int decipherNumBlocks ;
+	
 	/**
 	 * Input a string that will be md5 hashed to create the key.
 	 * 
@@ -43,6 +49,8 @@ public class Crypto {
 	public Crypto(String key) {
 		SecretKeySpec skey = new SecretKeySpec(getMD5(key), "AES");
 		this.setupCrypto(skey);
+		this.decipherCurrentBlock = 0 ;
+		this.decipherNumBlocks = 0 ;
 	}
 
 	private void setupCrypto(SecretKey key) {
@@ -125,15 +133,24 @@ public class Crypto {
 	 */
 	public byte[] encrypt(byte[] plainBytes) {
 		try {
-			byte[] ciphertext = ecipher.update(plainBytes);
-//            byte[] ciphertext = ecipher.doFinal(plainBytes);
-			return ciphertext;
+		  int numBlocks = (plainBytes.length+4) / 512 + 1 ;
+		  ByteBuffer outDataBuf = ByteBuffer.allocate(plainBytes.length + 4 + 512) ;
+		  outDataBuf.putInt(numBlocks) ;
+
+		  for (int numBlock=0 ; numBlock < numBlocks-1; numBlock++) {
+		    byte[] ciphertext = ecipher.update(ArrayUtils.subarray(plainBytes, numBlock*512, (numBlock+1)*512));
+		    outDataBuf.put(ciphertext) ;
+		  }
+		  
+      byte[] ciphertext = ecipher.doFinal(ArrayUtils.subarray(plainBytes, (numBlocks-1)*512, numBlocks*512));
+      outDataBuf.put(ciphertext) ;
+
+      return Arrays.copyOf(outDataBuf.array(), outDataBuf.position());
 		}
 		catch(Exception e) {
 			log.error(e);
 			return null;
 		}
-
 	}
 
 	public void decrypt(InputStream in, OutputStream out) {
@@ -173,15 +190,33 @@ public class Crypto {
 	}
 
 	public byte[] decrypt(byte[] ciphertext) {
-		try {
-            return dcipher.update(ciphertext);
-//            return dcipher.doFinal(ciphertext);
+	  // Here arrives always 512 bytes
+
+	  byte[] arrayToDecipher = ciphertext ;
+	  
+	  if (this.decipherNumBlocks == 0) { // => First call to decipher
+	    ByteBuffer inDataBuf = ByteBuffer.wrap(ciphertext) ;
+	    this.decipherNumBlocks = inDataBuf.getInt() ;
+	    arrayToDecipher = Arrays.copyOfRange(ciphertext, 4, ciphertext.length) ;
+	  }
+
+	  this.decipherCurrentBlock++ ;
+
+	  try {      
+      if (this.decipherCurrentBlock < this.decipherNumBlocks) {
+        return dcipher.update(arrayToDecipher);
+      }
+      
+  	  if (this.decipherCurrentBlock == this.decipherNumBlocks) {
+        return dcipher.doFinal(arrayToDecipher);
+  	  }
 		}
 		catch(Exception e) {
 			log.error("Lenght: " + ciphertext.length, e);
 			log.error(e);
 			return null;
 		}
+	  return null ; // should never get here but...
 	}
 	
 	private static byte[] getMD5(String input) {

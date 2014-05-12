@@ -110,7 +110,7 @@ public class TestCodec {
 	@Test
 	public void ultimateTest() throws IOException {
 	    
-	    int NUM_ELEMS = 1 ;
+	    int NUM_ELEMS = 256 ;
 	    
 	    this.conf.set(CryptoCodec.CRYPTO_SECRET_KEY, "Una clave cualquiera");
         // Create the codec
@@ -124,7 +124,7 @@ public class TestCodec {
 
         // Generate data
         DataOutputBuffer data = new DataOutputBuffer();
-        for(int i = 0; i < NUM_ELEMS; i++) {
+        for(int i = 1; i <= NUM_ELEMS; i++) {
             data.writeInt(i) ;
         }
         
@@ -144,7 +144,7 @@ public class TestCodec {
         DataInputStream inflateIn = new DataInputStream(new BufferedInputStream(inflateFilter));
         
         // Check
-        for(int i = 0; i < NUM_ELEMS; i++) {
+        for(int i = 1; i <= NUM_ELEMS; i++) {
             Assert.assertEquals(i, inflateIn.readInt()) ;
         }
 	}
@@ -236,8 +236,8 @@ public class TestCodec {
 												InstantiationException,
 												IllegalAccessException {
 		conf.set(CryptoCodec.CRYPTO_SECRET_KEY, "Una clave cualquiera");
-		//sequenceFileCodecTest(conf, 100, "org.apache.hadoop.io.compress.CryptoCodec", 100);
-		sequenceFileCodecTest(conf, 200000, "org.apache.hadoop.io.compress.CryptoCodec", 100000);
+		sequenceFileCodecTest(conf, 100, "org.apache.hadoop.io.compress.CryptoCodec", 100);
+		//sequenceFileCodecTest(conf, 200000, "org.apache.hadoop.io.compress.CryptoCodec", 100000);
 	}
 
 	private static void sequenceFileCodecTest(Configuration conf, int lines, String codecClass, int blockSize)	throws IOException,
