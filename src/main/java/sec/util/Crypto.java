@@ -125,7 +125,8 @@ public class Crypto {
 	 */
 	public byte[] encrypt(byte[] plainBytes) {
 		try {
-			byte[] ciphertext = ecipher.doFinal(plainBytes);
+			byte[] ciphertext = ecipher.update(plainBytes);
+//            byte[] ciphertext = ecipher.doFinal(plainBytes);
 			return ciphertext;
 		}
 		catch(Exception e) {
@@ -173,8 +174,8 @@ public class Crypto {
 
 	public byte[] decrypt(byte[] ciphertext) {
 		try {
-//            return dcipher.update(ciphertext);
-            return dcipher.doFinal(ciphertext);
+            return dcipher.update(ciphertext);
+//            return dcipher.doFinal(ciphertext);
 		}
 		catch(Exception e) {
 			log.error("Lenght: " + ciphertext.length, e);
