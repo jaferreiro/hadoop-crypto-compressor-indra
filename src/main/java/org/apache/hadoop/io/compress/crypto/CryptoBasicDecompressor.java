@@ -75,7 +75,7 @@ public class CryptoBasicDecompressor implements Decompressor {
 
 	private int flushBuffer(byte[] buf, int off, int len) {
 		int size = Math.min(Math.min(len, buf.length) - off, out.position());
-		LOG.info("flushBuffer size:" + size);
+		LOG.debug("flushBuffer size:" + size);
 		if(size <= 0)
 			return 0;
 		out.flip();

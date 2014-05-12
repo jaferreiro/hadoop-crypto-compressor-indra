@@ -70,7 +70,6 @@ public class CommandHandler {
 	}
 
 	private static void createErrorMsgAndExit(String errorMsg) {
-		System.err.println(errorMsg);
 		System.exit(-1);
 	}
 
