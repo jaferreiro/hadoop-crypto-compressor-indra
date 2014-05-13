@@ -237,7 +237,7 @@ public class TestCodec {
 												IllegalAccessException {
 		conf.set(CryptoCodec.CRYPTO_SECRET_KEY, "Una clave cualquiera");
 		sequenceFileCodecTest(conf, 100, "org.apache.hadoop.io.compress.CryptoCodec", 100);
-		//sequenceFileCodecTest(conf, 200000, "org.apache.hadoop.io.compress.CryptoCodec", 100000);
+		sequenceFileCodecTest(conf, 200000, "org.apache.hadoop.io.compress.CryptoCodec", 100000);
 	}
 
 	private static void sequenceFileCodecTest(Configuration conf, int lines, String codecClass, int blockSize)	throws IOException,
