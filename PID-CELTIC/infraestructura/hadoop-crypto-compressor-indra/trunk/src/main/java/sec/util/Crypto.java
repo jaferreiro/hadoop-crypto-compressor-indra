@@ -7,11 +7,9 @@ import java.security.MessageDigest;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
 
-import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
-import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -19,7 +17,6 @@ import javax.crypto.spec.SecretKeySpec;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.io.IOUtils;
 
 /**
  * Main Crypto class it's responsible for
@@ -37,8 +34,12 @@ public class Crypto {
 	Cipher ecipher;
 
 	Cipher dcipher;
-	int decipherCurrentBlock ;
-	int decipherNumBlocks ;
+
+	/** For decryption: expected compressed size of the current message being deciphered. -1 = no deciphering in progress */
+	private long decipherCompressedSize = -1 ;
+
+	/** For decryption: current deciphered message size (of the compressed arrived, not uncompressed) */
+	private long currentDecipheredSize = 0 ;
 	
 	/**
 	 * Input a string that will be md5 hashed to create the key.
@@ -49,8 +50,8 @@ public class Crypto {
 	public Crypto(String key) {
 		SecretKeySpec skey = new SecretKeySpec(getMD5(key), "AES");
 		this.setupCrypto(skey);
-		this.decipherCurrentBlock = 0 ;
-		this.decipherNumBlocks = 0 ;
+		this.decipherCompressedSize = -1 ;
+		this.currentDecipheredSize = 0 ;
 	}
 
 	private void setupCrypto(SecretKey key) {
@@ -129,23 +130,22 @@ public class Crypto {
 	/**
 	 * Input is a string to encrypt.
 	 * 
+	 * returns an array with a prefix of 16 bytes (8 bytes long + 8 bytes padding) with the compressed size.
+	 * 
 	 * @return a Hex string of the byte array
 	 */
 	public byte[] encrypt(byte[] plainBytes) {
+		// Here arrives in chunks of "encrypt buffer" size
 	    try {
-		  int numBlocks = (plainBytes.length+4) / 512 + 1 ;
-		  ByteBuffer outDataBuf = ByteBuffer.allocate(plainBytes.length + 4 + 512) ;
-		  outDataBuf.putInt(numBlocks) ;
-
-		  for (int numBlock=0 ; numBlock < numBlocks-1; numBlock++) {
-		    byte[] ciphertext = ecipher.update(ArrayUtils.subarray(plainBytes, numBlock*512, (numBlock+1)*512));
-		    outDataBuf.put(ciphertext) ;
-		  }
 		  
-		  byte[] ciphertext = ecipher.doFinal(ArrayUtils.subarray(plainBytes, (numBlocks-1)*512, numBlocks*512));
-		  outDataBuf.put(ciphertext) ;
+		  byte[] ciphertext = ecipher.doFinal(plainBytes);
 
-		  return Arrays.copyOf(outDataBuf.array(), outDataBuf.position());
+		  long compressedSize = ciphertext.length ;
+		  ByteBuffer outDataBuf = ByteBuffer.allocate(16) ; // 1 AES chunk
+		  outDataBuf.putLong(compressedSize) ;
+		  outDataBuf.put(new byte[]{0,0,0,0,0,0,0,0}) ; // 8 bytes padding
+
+		  return ArrayUtils.addAll(outDataBuf.array(), ciphertext) ;
 		}
 		catch(Exception e) {
 			log.error(e);
@@ -189,29 +189,49 @@ public class Crypto {
 		}
 	}
 
+	/**
+	 * Decrypts a block
+	 * In the first block receives 4 bytes of expected compressed size + 12 bytes of padding + data
+	 * The rest of the blocks are data.
+	 * 
+	 * @param ciphertext
+	 * @return
+	 */
 	public byte[] decrypt(byte[] ciphertext) {
-	  // Here arrives always 512 bytes
+	  // Here arrives in chunks of "decipher buffer" size
 
 	  byte[] arrayToDecipher = ciphertext ;
 	  
-	  if (this.decipherNumBlocks == 0) { // => First call to decipher
+	  if (this.decipherCompressedSize == -1) { // => First call to decipher
 	    ByteBuffer inDataBuf = ByteBuffer.wrap(ciphertext) ;
-	    this.decipherNumBlocks = inDataBuf.getInt() ;
-	    arrayToDecipher = Arrays.copyOfRange(ciphertext, 4, ciphertext.length) ;
+	    this.decipherCompressedSize = inDataBuf.getLong() ; // 8 bytes
+	    inDataBuf.get(new byte[8]); // Read 8 bytes of padding
+	    this.currentDecipheredSize = 0 ;
+	    arrayToDecipher = Arrays.copyOfRange(ciphertext, 16, ciphertext.length) ;
 	  }
 
-	  this.decipherCurrentBlock++ ;
-
-	  try {      
-		  if (this.decipherCurrentBlock < this.decipherNumBlocks) {
+	  int incomingEncryptedBlockSize = arrayToDecipher.length ;
+	  
+	  try {
+		  if (this.currentDecipheredSize + incomingEncryptedBlockSize < this.decipherCompressedSize) {
+			  this.currentDecipheredSize += incomingEncryptedBlockSize ;
 			  return dcipher.update(arrayToDecipher);
 		  }
       
-		  if (this.decipherCurrentBlock == this.decipherNumBlocks) {
-			  this.decipherCurrentBlock = 0 ;
-			  this.decipherNumBlocks = 0 ;
+		  if (this.currentDecipheredSize + incomingEncryptedBlockSize == this.decipherCompressedSize) {
+			  this.decipherCompressedSize = -1 ;
+			  this.currentDecipheredSize = 0 ;
 			  return dcipher.doFinal(arrayToDecipher);
 		  }
+		  
+		  if (this.currentDecipheredSize + incomingEncryptedBlockSize > this.decipherCompressedSize) {
+			  arrayToDecipher = ArrayUtils.subarray(arrayToDecipher, 0, (int) (this.decipherCompressedSize - this.currentDecipheredSize)) ;
+			  if (log.isWarnEnabled()) log.warn("Received " + incomingEncryptedBlockSize + "to decrypt but expected at most " + (this.decipherCompressedSize - this.currentDecipheredSize) + "bytes. Ignoring the spare bytes.") ;
+			  this.decipherCompressedSize = -1 ;
+			  this.currentDecipheredSize = 0 ;
+			  return dcipher.doFinal(arrayToDecipher);
+		  }
+		  
 	  }
 	  catch(Exception e) {
 			log.error("Lenght: " + ciphertext.length, e);
