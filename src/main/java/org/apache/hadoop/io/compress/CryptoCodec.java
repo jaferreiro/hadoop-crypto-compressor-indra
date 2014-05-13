@@ -47,7 +47,7 @@ public class CryptoCodec implements CompressionCodec, Configurable {
 
 	@Override
 	public CompressionInputStream createInputStream(InputStream in, Decompressor decomp) throws IOException {
-		LOG.info("Creating DecompressorStream stream");
+		LOG.debug("Creating DecompressorStream stream");
 //      return new DecompressorStream(in, decomp, config.getInt("io.seqfile.compress.blocksize", 1000000));
       return new DecompressorStream(in, decomp);
 	}
@@ -59,7 +59,7 @@ public class CryptoCodec implements CompressionCodec, Configurable {
 
 	@Override
 	public CompressionOutputStream createOutputStream(OutputStream out, Compressor comp) throws IOException {
-		LOG.info("Creating output stream");
+		LOG.debug("Creating output stream");
 //      return new CompressorStream(out, comp, config.getInt("io.seqfile.compress.blocksize", 1000000));
       return new CompressorStream(out, comp);
 	}

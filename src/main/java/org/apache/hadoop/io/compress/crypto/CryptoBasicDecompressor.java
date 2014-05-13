@@ -23,7 +23,7 @@ public class CryptoBasicDecompressor implements Decompressor {
 
 	public CryptoBasicDecompressor(String key) {
 		crypto = new Crypto(key);
-		LOG.info("Init CryptoBasicDecompressor...");
+		if (LOG.isDebugEnabled()) LOG.debug("Init CryptoBasicDecompressor...");
 	}
 
 	@Override
@@ -31,17 +31,17 @@ public class CryptoBasicDecompressor implements Decompressor {
 		ensureBuffer(len);
 
 		if(out.position() >= len) {
-			LOG.debug("out.position():" + out.position() + " len:" + len);
+			if (LOG.isDebugEnabled()) LOG.debug("out.position():" + out.position() + " len:" + len);
 			finished = true;
 		}
 
 		if(finished && in == null) {
-			LOG.debug("decompress flushBuffer....");
+			if (LOG.isDebugEnabled()) LOG.debug("decompress flushBuffer....");
 			return flushBuffer(buf, off, out.position());
 		}
 
 		if(needsInput()) {
-			LOG.debug("needsInput....");
+			if (LOG.isDebugEnabled()) LOG.debug("needsInput....");
 			return 0;
 		}
 
@@ -50,7 +50,7 @@ public class CryptoBasicDecompressor implements Decompressor {
 		if(b == null) {
 			throw new IOException("Invalid key");
 		}
-		LOG.debug("decrypt:" + b.length);
+		if (LOG.isDebugEnabled()) LOG.debug("decrypt:" + b.length);
 		ensureBuffer(out.position() + b.length);
 		out.put(b);
 		return flushBuffer(buf, off, len);
@@ -75,7 +75,7 @@ public class CryptoBasicDecompressor implements Decompressor {
 
 	private int flushBuffer(byte[] buf, int off, int len) {
 		int size = Math.min(Math.min(len, buf.length - off), out.position());
-		LOG.debug("flushBuffer size:" + size);
+		if (LOG.isDebugEnabled()) LOG.debug("flushBuffer size:" + size);
 		if(size <= 0)
 			return 0;
 		out.flip();
@@ -92,7 +92,7 @@ public class CryptoBasicDecompressor implements Decompressor {
 
 	@Override
 	public boolean finished() {
-		LOG.info("finished:" + finished);
+		if (LOG.isDebugEnabled()) LOG.debug("finished:" + finished);
 		return finished;
 	}
 
@@ -101,7 +101,7 @@ public class CryptoBasicDecompressor implements Decompressor {
 		boolean needsInput = (in == null || in.length < 0);
 		if(needsInput)
 			finished = true;
-		LOG.info("needsInput:" + needsInput);
+		if (LOG.isDebugEnabled()) LOG.debug("needsInput:" + needsInput);
 		return needsInput;
 	}
 
@@ -117,7 +117,7 @@ public class CryptoBasicDecompressor implements Decompressor {
 
 	@Override
 	public synchronized void setInput(byte[] buf, int offset, int length) {
-		LOG.info("setInputsize buf size" + buf.length + " length:" + length);
+		if (LOG.isDebugEnabled()) LOG.debug("setInputsize buf size" + buf.length + " length:" + length);
 		if(length > 0) {
 			in = new byte[length];
 			int inIdx = 0;
