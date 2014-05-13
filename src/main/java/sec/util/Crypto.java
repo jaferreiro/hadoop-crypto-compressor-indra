@@ -132,7 +132,7 @@ public class Crypto {
 	 * @return a Hex string of the byte array
 	 */
 	public byte[] encrypt(byte[] plainBytes) {
-		try {
+	    try {
 		  int numBlocks = (plainBytes.length+4) / 512 + 1 ;
 		  ByteBuffer outDataBuf = ByteBuffer.allocate(plainBytes.length + 4 + 512) ;
 		  outDataBuf.putInt(numBlocks) ;
@@ -142,10 +142,10 @@ public class Crypto {
 		    outDataBuf.put(ciphertext) ;
 		  }
 		  
-      byte[] ciphertext = ecipher.doFinal(ArrayUtils.subarray(plainBytes, (numBlocks-1)*512, numBlocks*512));
-      outDataBuf.put(ciphertext) ;
+		  byte[] ciphertext = ecipher.doFinal(ArrayUtils.subarray(plainBytes, (numBlocks-1)*512, numBlocks*512));
+		  outDataBuf.put(ciphertext) ;
 
-      return Arrays.copyOf(outDataBuf.array(), outDataBuf.position());
+		  return Arrays.copyOf(outDataBuf.array(), outDataBuf.position());
 		}
 		catch(Exception e) {
 			log.error(e);
@@ -167,9 +167,9 @@ public class Crypto {
 		catch(java.io.IOException e) {
 			log.error(e);
 		}
-		finally {
-            try { in.close(); } catch (Exception e1) {}
-            try { out.close(); } catch (Exception e2) {}
+        finally {
+        	try { in.close(); } catch (Exception e1) {}
+        	try { out.close(); } catch (Exception e2) {}
 		}
 	}
 
@@ -203,19 +203,21 @@ public class Crypto {
 	  this.decipherCurrentBlock++ ;
 
 	  try {      
-      if (this.decipherCurrentBlock < this.decipherNumBlocks) {
-        return dcipher.update(arrayToDecipher);
-      }
+		  if (this.decipherCurrentBlock < this.decipherNumBlocks) {
+			  return dcipher.update(arrayToDecipher);
+		  }
       
-  	  if (this.decipherCurrentBlock == this.decipherNumBlocks) {
-        return dcipher.doFinal(arrayToDecipher);
-  	  }
-		}
-		catch(Exception e) {
+		  if (this.decipherCurrentBlock == this.decipherNumBlocks) {
+			  this.decipherCurrentBlock = 0 ;
+			  this.decipherNumBlocks = 0 ;
+			  return dcipher.doFinal(arrayToDecipher);
+		  }
+	  }
+	  catch(Exception e) {
 			log.error("Lenght: " + ciphertext.length, e);
 			log.error(e);
 			return null;
-		}
+	  }
 	  return null ; // should never get here but...
 	}
 	
