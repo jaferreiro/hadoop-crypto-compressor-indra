@@ -1,5 +1,6 @@
 package sec.util;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -7,9 +8,11 @@ import java.security.MessageDigest;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -196,49 +199,55 @@ public class Crypto {
 	 * 
 	 * @param ciphertext
 	 * @return
+	 * @throws IOException 
 	 */
-	public byte[] decrypt(byte[] ciphertext) {
-	  // Here arrives in chunks of "decipher buffer" size
+	public byte[] decrypt(byte[] ciphertext) throws IOException {
+		// Here arrives in chunks of "decipher buffer" size
 
-	  byte[] arrayToDecipher = ciphertext ;
-	  
-	  if (this.decipherCompressedSize == -1) { // => First call to decipher
-	    ByteBuffer inDataBuf = ByteBuffer.wrap(ciphertext) ;
-	    this.decipherCompressedSize = inDataBuf.getLong() ; // 8 bytes
-	    inDataBuf.get(new byte[8]); // Read 8 bytes of padding
-	    this.currentDecipheredSize = 0 ;
-	    arrayToDecipher = Arrays.copyOfRange(ciphertext, 16, ciphertext.length) ;
-	  }
+		byte[] arrayToDecipher = ciphertext;
 
-	  int incomingEncryptedBlockSize = arrayToDecipher.length ;
-	  
-	  try {
-		  if (this.currentDecipheredSize + incomingEncryptedBlockSize < this.decipherCompressedSize) {
-			  this.currentDecipheredSize += incomingEncryptedBlockSize ;
-			  return dcipher.update(arrayToDecipher);
-		  }
-      
-		  if (this.currentDecipheredSize + incomingEncryptedBlockSize == this.decipherCompressedSize) {
-			  this.decipherCompressedSize = -1 ;
-			  this.currentDecipheredSize = 0 ;
-			  return dcipher.doFinal(arrayToDecipher);
-		  }
-		  
-		  if (this.currentDecipheredSize + incomingEncryptedBlockSize > this.decipherCompressedSize) {
-			  arrayToDecipher = ArrayUtils.subarray(arrayToDecipher, 0, (int) (this.decipherCompressedSize - this.currentDecipheredSize)) ;
-			  if (log.isWarnEnabled()) log.warn("Received " + incomingEncryptedBlockSize + "to decrypt but expected at most " + (this.decipherCompressedSize - this.currentDecipheredSize) + "bytes. Ignoring the spare bytes.") ;
-			  this.decipherCompressedSize = -1 ;
-			  this.currentDecipheredSize = 0 ;
-			  return dcipher.doFinal(arrayToDecipher);
-		  }
-		  
-	  }
-	  catch(Exception e) {
-			log.error("Lenght: " + ciphertext.length, e);
-			log.error(e);
-			return null;
-	  }
-	  return null ; // should never get here but...
+		if (this.decipherCompressedSize == -1) { // => First call to decipher
+			ByteBuffer inDataBuf = ByteBuffer.wrap(ciphertext);
+			this.decipherCompressedSize = inDataBuf.getLong(); // 8 bytes
+			inDataBuf.get(new byte[8]); // Read 8 bytes of padding
+			this.currentDecipheredSize = 0;
+			arrayToDecipher = Arrays.copyOfRange(ciphertext, 16, ciphertext.length);
+		}
+
+		byte[] postArrayToDecipher = null; // optional array to decipher after this block
+		if (arrayToDecipher.length > (this.decipherCompressedSize - this.currentDecipheredSize)) {
+			// Received too much data, must be two+ blocks in one call
+			postArrayToDecipher = Arrays.copyOfRange(arrayToDecipher, (int) (this.decipherCompressedSize - this.currentDecipheredSize), arrayToDecipher.length);
+			arrayToDecipher = Arrays.copyOfRange(arrayToDecipher, 0, (int) (this.decipherCompressedSize - this.currentDecipheredSize));
+		}
+
+		int incomingEncryptedBlockSize = arrayToDecipher.length;
+		if (this.currentDecipheredSize + incomingEncryptedBlockSize < this.decipherCompressedSize) {
+			this.currentDecipheredSize += incomingEncryptedBlockSize;
+			return dcipher.update(arrayToDecipher);
+		}
+
+		if (this.currentDecipheredSize + incomingEncryptedBlockSize == this.decipherCompressedSize) {
+
+			this.decipherCompressedSize = -1;
+			this.currentDecipheredSize = 0;
+
+			byte[] decipheredText;
+			try {
+				decipheredText = dcipher.doFinal(arrayToDecipher);
+			} catch (Exception e) {
+				log.error("Error deciphering doFinal().",e);
+				throw new IOException(e) ;
+			}
+			if (postArrayToDecipher != null) {
+				decipheredText = ArrayUtils.addAll(decipheredText, this.decrypt(postArrayToDecipher));
+			}
+			return decipheredText;
+		}
+
+		// case when this.currentDecipheredSize + incomingEncryptedBlockSize > this.decipherCompressedSize that should not happen :P
+		throw new RuntimeException("Received " + incomingEncryptedBlockSize + "to decrypt but expected at most " + (this.decipherCompressedSize - this.currentDecipheredSize) + "bytes.");
+		
 	}
 	
 	private static byte[] getMD5(String input) {
