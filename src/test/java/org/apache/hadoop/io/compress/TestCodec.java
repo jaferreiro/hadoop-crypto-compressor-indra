@@ -27,6 +27,7 @@ import java.util.Random;
 
 import junit.framework.Assert;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -65,6 +66,12 @@ public class TestCodec {
 	void codecBufferSizeTest(int compressBufferSize, int decompressBufferSize)	throws IOException,
 																				ClassNotFoundException {
 		DataOutputBuffer data = new DataOutputBuffer();
+
+		/*for (int i=0; i<20; i++) {
+			for (int j=1; j<=9; j++) data.write(j) ;
+			for (int k=1+i*256; k<=(127+i*256); k++) data.writeInt(k) ;
+		}*/
+		
 		RandomDatum.Generator generator = new RandomDatum.Generator(seed);
 		for(int i = 0; i < 20; ++i) {
 			generator.next();
@@ -95,7 +102,9 @@ public class TestCodec {
 
 		b = new byte[decompressBufferSize];
 		byte[] b2 = new byte[decompressBufferSize];
-		ByteArrayInputStream compressDataStream = new ByteArrayInputStream(compressedDataBuffer.getData());
+
+		byte[] dataBuffer = compressedDataBuffer.getData() ;
+		ByteArrayInputStream compressDataStream = new ByteArrayInputStream(ArrayUtils.subarray(dataBuffer, 0, compressedDataBuffer.getLength())) ;
 		CompressionInputStream ds = c.createInputStream(compressDataStream);
 
 		while((len = ds.read(b)) > 0) {
@@ -108,7 +117,7 @@ public class TestCodec {
 	}
 
 	@Test
-	public void ultimateTest() throws IOException {
+	public void anotherTest() throws IOException {
 	    
 	    int NUM_ELEMS = 256 ;
 	    
