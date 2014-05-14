@@ -246,6 +246,7 @@ public class Crypto {
 		}
 
 		// case when this.currentDecipheredSize + incomingEncryptedBlockSize > this.decipherCompressedSize that should not happen :P
+		log.error("Received " + incomingEncryptedBlockSize + "to decrypt but expected at most " + (this.decipherCompressedSize - this.currentDecipheredSize) + "bytes.");
 		throw new RuntimeException("Received " + incomingEncryptedBlockSize + "to decrypt but expected at most " + (this.decipherCompressedSize - this.currentDecipheredSize) + "bytes.");
 		
 	}
